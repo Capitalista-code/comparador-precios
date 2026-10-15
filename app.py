@@ -3,43 +3,46 @@ import streamlit as st
 import pandas as pd
 import psycopg
 
-# Configuración inicial de la página
+# Configuración inicial de la página (ancho completo, compacto)
 st.set_page_config(
-    page_title="Indicadores Argentina", 
-    page_icon="🇦🇷", 
+    page_title="Panel Bursátil & Energético - Argentina", 
+    page_icon="📈", 
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# Estilos CSS personalizados para darle un toque moderno
+# Estilos CSS estilo Ráva / Terminal Financiera (minimalista, denso, bordes finos)
 st.markdown("""
     <style>
     .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
     }
-    .metric-card {
-        background-color: #1e2129;
-        border: 1px solid #2d3139;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        margin-bottom: 15px;
+    h1, h2, h3 {
+        letter-spacing: -0.5px;
     }
-    h1 {
-        color: #fafafa;
-        font-weight: 700;
+    .stDataFrame {
+        border: 1px solid #2b2b2b;
+        border-radius: 4px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Título Principal
-st.title("🇦🇷 Panel Económico & Energético")
-st.markdown("Cotizaciones del dólar y precios de combustibles actualizados en tiempo real desde Supabase.")
-st.divider()
+# Título y barra superior minimalista
+col_title, col_btn = st.columns([8, 2])
+with col_title:
+    st.markdown("### 📈 Panel Financiero & Energético | Argentina")
+with col_btn:
+    if st.button("🔄 Actualizar", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
-# Conexión y carga de datos
-@st.cache_data(ttl=600)
+st.markdown("<hr style='margin: 0.2rem 0 1rem 0; border-color: #333;'>", unsafe_allow_html=True)
+
+# Conexión y carga de datos con caché
+@st.cache_data(ttl=300)
 def load_data():
     db_url = os.environ.get("DATABASE_URL") or (st.secrets.get("DATABASE_URL") if hasattr(st, "secrets") else None)
     if not db_url:
@@ -67,64 +70,57 @@ def load_data():
 
 df_dolar, df_fuel = load_data()
 
-# Sidebar con opciones y estado
-with st.sidebar:
-    st.header("⚙️ Controles")
-    if st.button("🔄 Actualizar Datos", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
-    
-    st.markdown("---")
-    st.info("💡 **Tip:** Los datos de combustibles se actualizan automáticamente mediante GitHub Actions.")
-    st.markdown("Desarrollado con **Streamlit**, **Supabase** y **Python**.")
-
-# Pestañas principales
-tab1, tab2 = st.tabs(["💱 Cotizaciones de Dólares", "⛽ Precios de Combustibles"])
+# Pestañas limpias estilo panel
+tab1, tab2 = st.tabs(["💱 Cotizaciones de Dólares", "⛽ Matriz de Combustibles"])
 
 with tab1:
-    st.subheader("💱 Dólar en Argentina")
     if df_dolar.empty:
-        st.warning("No hay datos de dólares guardados todavía.")
+        st.info("No hay cotizaciones de dólares registradas.")
     else:
-        cols = st.columns(3)
-        for index, row in df_dolar.iterrows():
-            col = cols[index % 3]
-            with col:
-                sell_val = f"\${row['sell_price']:,.2f}" if pd.notnull(row['sell_price']) else "N/D"
-                buy_val = f"Compra: \${row['buy_price']:,.2f}" if pd.notnull(row['buy_price']) else "Compra: N/D"
-                
-                st.metric(
-                    label=row["name"],
-                    value=sell_val,
-                    delta=buy_val
-                )
-                st.caption(f"Actualizado: {row['recorded_at']}")
-                st.markdown("---")
+        df_dolar_clean = df_dolar[["name", "buy_price", "sell_price", "recorded_at"]].copy()
+        df_dolar_clean.columns = ["Indicador", "Compra ($)", "Venta ($)", "Última Actualización"]
+        df_dolar_clean["Compra ($)"] = df_dolar_clean["Compra ($)"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
+        df_dolar_clean["Venta ($)"] = df_dolar_clean["Venta ($)"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
+        
+        st.dataframe(
+            df_dolar_clean,
+            hide_index=True,
+            use_container_width=True
+        )
 
 with tab2:
-    st.subheader("⛽ Estación de Precios por Provincia")
     if df_fuel.empty:
-        st.warning("No hay datos de combustibles guardados todavía.")
+        st.info("No hay precios de combustibles registrados. Ejecutá el recolector en GitHub Actions.")
     else:
         ciudades = sorted(df_fuel["city"].unique())
         default_idx = ciudades.index("SANTA FE") if "SANTA FE" in ciudades else 0
         
-        selected_city = st.selectbox("🏙️ Seleccioná la Capital / Ciudad:", ciudades, index=default_idx)
+        c1, c2 = st.columns([3, 7])
+        with c1:
+            selected_city = st.selectbox("Seleccionar Ciudad:", ciudades, index=default_idx)
         
         df_filtered = df_fuel[df_fuel["city"] == selected_city]
-        empresas = sorted(df_filtered["company"].unique())
         
-        if not empresas:
-            st.info(f"No hay registros de combustibles para {selected_city}.")
+        if df_filtered.empty:
+            st.warning(f"Sin datos para {selected_city}.")
         else:
-            cols_emp = st.columns(min(len(empresas), 3))
-            for i, emp in enumerate(empresas):
-                col = cols_emp[i % len(cols_emp)]
-                with col:
-                    st.markdown(f"### ⛽ {emp}")
-                    df_emp = df_filtered[df_filtered["company"] == emp]
-                    
-                    for _, row in df_emp.iterrows():
-                        precio_str = f"\${row['price']:,.2f}" if pd.notnull(row['price']) else "N/D"
-                        st.markdown(f"**{row['fuel_type']}**: `{precio_str}`")
-                    st.markdown("---")
+            # Matriz cruzada (Combustibles en filas, Marcas en columnas estilo Ráva)
+            pivot_fuel = df_filtered.pivot_table(
+                index="fuel_type", 
+                columns="company", 
+                values="price", 
+                aggfunc="first"
+            ).reset_index()
+            
+            for col in pivot_fuel.columns:
+                if col != "fuel_type":
+                    pivot_fuel[col] = pivot_fuel[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
+            
+            pivot_fuel = pivot_fuel.rename(columns={"fuel_type": "Combustible"})
+            
+            st.markdown(f"**Precios en {selected_city}**")
+            st.dataframe(
+                pivot_fuel,
+                hide_index=True,
+                use_container_width=True
+            )
