@@ -1,0 +1,41 @@
+name: scrape-coto
+
+on:
+  schedule:
+    # GitHub Actions usa UTC. 09:17 UTC = 06:17 en Argentina (UTC-3, sin horario de verano).
+    # Evitá minutos redondos (:00, :30): son los más congestionados y los que más se demoran.
+    - cron: "17 9 * * *"
+  workflow_dispatch:        # botón "Run workflow" para pruebas manuales
+
+concurrency:                # nunca dos corridas a la vez
+  group: scrape-coto
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+      - run: playwright install --with-deps chromium
+
+      - name: Scrape Coto
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}   # string del *pooler* de Supabase (ver notas)
+          PROXY_URL: ${{ secrets.PROXY_URL }}         # opcional; vacío = sin proxy
+        run: python coto_scraper.py --max-pages 60 --delay-min 3 --delay-max 7 --debug-dir debug/
+
+      - name: Guardar JSON de depuración si falló
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-json
+          path: debug/
+          retention-days: 7
