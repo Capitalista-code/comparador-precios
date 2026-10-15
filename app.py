@@ -3,43 +3,24 @@ import streamlit as st
 import pandas as pd
 import psycopg
 
-# Configuración inicial de la página (ancho completo, compacto)
+# Configuración inicial de la página
 st.set_page_config(
     page_title="Panel Bursátil & Energético - Argentina", 
     page_icon="📈", 
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    layout="wide"
 )
 
-# Estilos CSS estilo Ráva / Terminal Financiera (minimalista, denso, bordes finos)
-st.markdown("""
-    <style>
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-        padding-left: 2rem;
-        padding-right: 2rem;
-    }
-    h1, h2, h3 {
-        letter-spacing: -0.5px;
-    }
-    .stDataFrame {
-        border: 1px solid #2b2b2b;
-        border-radius: 4px;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# Título y barra superior minimalista
-col_title, col_btn = st.columns([8, 2])
+# Encabezado limpio y visible sin cortes
+col_title, col_btn = st.columns([7, 3])
 with col_title:
-    st.markdown("### 📈 Panel Financiero & Energético | Argentina")
+    st.title("📈 Panel Financiero & Energético | Argentina")
 with col_btn:
-    if st.button("🔄 Actualizar", use_container_width=True):
+    st.write("") # Espaciador de alineación
+    if st.button("🔄 Actualizar Datos", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
-st.markdown("<hr style='margin: 0.2rem 0 1rem 0; border-color: #333;'>", unsafe_allow_html=True)
+st.markdown("---")
 
 # Conexión y carga de datos con caché
 @st.cache_data(ttl=300)
@@ -70,7 +51,23 @@ def load_data():
 
 df_dolar, df_fuel = load_data()
 
-# Pestañas limpias estilo panel
+# Función para unificar los nombres comerciales de los combustibles entre marcas
+def normalize_fuel(name):
+    n = str(name).upper().strip()
+    if "GNC" in n:
+        return "GNC"
+    elif "SUPER" in n:
+        return "Nafta Súper"
+    elif any(k in n for k in ["INFINIA", "PREMIUM", "V-POWER", "VPOWER", "QUANTIUM"]):
+        return "Nafta Premium"
+    elif any(k in n for k in ["DIESEL500", "DIESEL 500", "ULTRA", "AXION DIESEL", "PUMA DIESEL", "DIESEL COMUN"]):
+        return "Gasoil Común (Grado 2)"
+    elif any(k in n for k in ["INFINIA DIESEL", "ION", "EURO", "V-POWER DIESEL", "QUANTIUM DIESEL"]):
+        return "Gasoil Premium (Grado 3)"
+    else:
+        return name
+
+# Pestañas principales
 tab1, tab2 = st.tabs(["💱 Cotizaciones de Dólares", "⛽ Matriz de Combustibles"])
 
 with tab1:
@@ -97,28 +94,31 @@ with tab2:
         
         c1, c2 = st.columns([3, 7])
         with c1:
-            selected_city = st.selectbox("Seleccionar Ciudad:", ciudades, index=default_idx)
+            selected_city = st.selectbox("Seleccionar Ciudad / Capital:", ciudades, index=default_idx)
         
-        df_filtered = df_fuel[df_fuel["city"] == selected_city]
+        df_filtered = df_fuel[df_fuel["city"] == selected_city].copy()
         
         if df_filtered.empty:
             st.warning(f"Sin datos para {selected_city}.")
         else:
-            # Matriz cruzada (Combustibles en filas, Marcas en columnas estilo Ráva)
+            # Aplicamos la categoría unificada
+            df_filtered["fuel_category"] = df_filtered["fuel_type"].apply(normalize_fuel)
+            
+            # Creamos la matriz cruzada limpia y ordenada
             pivot_fuel = df_filtered.pivot_table(
-                index="fuel_type", 
+                index="fuel_category", 
                 columns="company", 
                 values="price", 
                 aggfunc="first"
             ).reset_index()
             
             for col in pivot_fuel.columns:
-                if col != "fuel_type":
+                if col != "fuel_category":
                     pivot_fuel[col] = pivot_fuel[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
             
-            pivot_fuel = pivot_fuel.rename(columns={"fuel_type": "Combustible"})
+            pivot_fuel = pivot_fuel.rename(columns={"fuel_category": "Combustible"})
             
-            st.markdown(f"**Precios en {selected_city}**")
+            st.markdown(f"**Comparativa de Precios en {selected_city}**")
             st.dataframe(
                 pivot_fuel,
                 hide_index=True,
