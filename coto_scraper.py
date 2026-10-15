@@ -250,38 +250,35 @@ def product_from_dict(d: dict, category: str | None) -> Product | None:
     url = urljoin(BASE, raw_url) if isinstance(raw_url, str) else None
     ext_id = id_from_url(url) or (str(_pick(flat, ID_KEYS)) if _pick(flat, ID_KEYS) is not None else None)
 
-    regular = parse_price(_pick(flat, REG_KEYS))
-    sale = parse_price(_pick(flat, SALE_KEYS))
-    base = parse_price(_pick(flat, PRICE_KEYS))
-    if regular is None:
-        regular = base
-    elif sale is None and base is not None and base < regular:
-        sale = base
-    if regular is None and sale is not None:
-        regular, sale = sale, None
-    if sale is not None and regular is not None and sale >= regular:
-        sale = None
-
-    # 🛑 FILTRO ANTICUOTAS Y PRECIOS FALSOS:
-    # Ningún producto de supermercado válido vale menos de $400. 
-    # Si detecta un valor menor, lo descarta (elimina cuotas coladas en el JSON).
-    if regular is not None and regular < 400:
-        regular = None
-    if sale is not None and sale < 400:
-        sale = None
-    if regular is None:
-        regular = sale
-    if sale is not None and regular is not None and sale >= regular:
-        sale = None
-
-    if not (name and ext_id and regular):
+    if not (name and ext_id):
         return None
+
+    # REGLA DEFINITIVA: Buscamos precios limpios en todo el diccionario
+    valid_prices = []
+    for k, v in flat.items():
+        # Si la clave del JSON habla de cuotas, la saltamos de inmediato
+        if any(w in k.lower() for w in ["cuota", "installment", "financi"]):
+            continue
+        p = parse_price(v)
+        # Descartamos cuotas sueltas (< 300) y valores inválidos
+        if p is not None and p >= 300:
+            valid_prices.append(p)
+
+    if not valid_prices:
+        return None
+
+    valid_prices = sorted(list(set(valid_prices)))
+    
+    # El precio más alto es el regular/lista, el menor es la oferta (si hay diferencia)
+    regular = valid_prices[-1]
+    sale = valid_prices[0] if len(valid_prices) > 1 and valid_prices[0] < regular else None
 
     raw_ean = _pick(flat, EAN_KEYS)
     size_base, size_unit, pack, unit_text = parse_size(name)
     stock = _pick(flat, STOCK_KEYS)
     img = _pick(flat, IMG_KEYS)
     brand = _pick(flat, BRAND_KEYS)
+    
     return Product(
         external_id=ext_id, name=name, url=url, regular_price=regular, sale_price=sale,
         brand=clean_text(str(brand)) if brand else None,
@@ -290,7 +287,6 @@ def product_from_dict(d: dict, category: str | None) -> Product | None:
         in_stock=bool(stock) if stock is not None else True,
         category=category, unit_text=unit_text, size_base=size_base, size_unit=size_unit, pack_qty=pack,
     )
-
 
 def extract_from_json(obj, category: str | None) -> list[Product]:
     """Recorre el JSON y toma cada dict que parezca un producto (no recursa dentro de él)."""
