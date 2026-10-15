@@ -355,14 +355,22 @@ def dom_fallback(page, category: str | None) -> list[Product]:
         lines = [clean_text(x) for x in c["text"].split("\n") if clean_text(x)]
         name = next((x for x in lines if len(x) > 3 and not re.match(r"^[$\d]|%|off|agregar|comprar", x, re.I)), None)
         
-        # FILTRO CLAVE: Excluir líneas que hablen de cuotas para no confundir precios
-        filtered_text = "\n".join([line for line in lines if "cuota" not in line.lower()])
-        prices = sorted({p for p in (parse_price(m) for m in re.findall(r"\$\s*[\d.]+(?:,\d{1,2})?", filtered_text)) if p})
+        # Filtro estricto: excluir líneas con palabras de financiación
+        filtered_text = "\n".join([line for line in lines if not any(w in line.lower() for w in ["cuota", "interés", "cftea", "tna"])])
+        
+        all_prices = [p for p in (parse_price(m) for m in re.findall(r"\$\s*[\d.]+(?:,\d{1,2})?", filtered_text)) if p]
+        
+        # Descartar precios absurdamente bajos que son cuotas (menor a $400)
+        prices = sorted({p for p in all_prices if p > 400})
         
         if not (name and prices):
             continue
         seen.add(ext_id)
-        regular, sale = prices[-1], (prices[0] if len(prices) > 1 else None)
+        
+        # El menor de los precios válidos es la oferta, el mayor es el regular
+        sale = prices[0] if len(prices) > 1 else None
+        regular = prices[-1]
+        
         sb, su, pk, ut = parse_size(name)
         out.append(Product(ext_id, name, c["href"], regular, sale, category=category,
                            unit_text=ut, size_base=sb, size_unit=su, pack_qty=pk))
