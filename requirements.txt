@@ -1,0 +1,2 @@
+playwright>=1.47
+psycopg[binary]>=3.2
