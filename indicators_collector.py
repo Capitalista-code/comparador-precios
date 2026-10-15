@@ -4,7 +4,34 @@ import requests
 import psycopg
 
 URL_DOLAR = "https://dolarapi.com/v1/dolares"
-CITIES = ["SANTA FE", "ROSARIO", "PARANA", "CAPITAL FEDERAL"]
+
+# Lista de capitales y principales ciudades de Argentina
+CITIES = [
+    "CAPITAL FEDERAL",
+    "LA PLATA",
+    "SAN FERNANDO DEL VALLE DE CATAMARCA",
+    "RESISTENCIA",
+    "RAWSON",
+    "CORDOBA",
+    "CORRIENTES",
+    "PARANA",
+    "FORMOSA",
+    "SAN SALVADOR DE JUJUY",
+    "SANTA ROSA",
+    "LA RIOJA",
+    "MENDOZA",
+    "POSADAS",
+    "NEUQUEN",
+    "VIEDMA",
+    "SALTA",
+    "SAN JUAN",
+    "SAN LUIS",
+    "RIO GALLEGOS",
+    "SANTA FE",
+    "SANTIAGO DEL ESTERO",
+    "USHUAIA",
+    "SAN MIGUEL DE TUCUMAN"
+]
 
 def main():
     db_url = os.environ.get("DATABASE_URL")
@@ -15,22 +42,25 @@ def main():
         with conn.cursor() as cur:
             # 1. Recolectar Dólares
             print("Consultando cotizaciones de dólares...")
-            resp_dolar = requests.get(URL_DOLAR, timeout=10)
-            resp_dolar.raise_for_status()
-            dolar_data = resp_dolar.json()
+            try:
+                resp_dolar = requests.get(URL_DOLAR, timeout=10)
+                resp_dolar.raise_for_status()
+                dolar_data = resp_dolar.json()
 
-            for item in dolar_data:
-                cur.execute(
-                    """
-                    INSERT INTO economic_indicators (indicator_type, name, buy_price, sell_price)
-                    VALUES (%s, %s, %s, %s)
-                    """,
-                    (item.get("casa"), item.get("nombre"), item.get("compra"), item.get("venta"))
-                )
-            print(f"-> Se guardaron {len(dolar_data)} indicadores de dólares.")
+                for item in dolar_data:
+                    cur.execute(
+                        """
+                        INSERT INTO economic_indicators (indicator_type, name, buy_price, sell_price)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (item.get("casa"), item.get("nombre"), item.get("compra"), item.get("venta"))
+                    )
+                print(f"-> Se guardaron {len(dolar_data)} indicadores de dólares.")
+            except Exception as e:
+                print(f"Error al consultar dólares: {e}")
 
-            # 2. Recolectar Combustibles
-            print("Consultando precios de combustibles...")
+            # 2. Recolectar Combustibles de todas las capitales
+            print("Consultando precios de combustibles en las capitales de Argentina...")
             for city in CITIES:
                 try:
                     url_fuel = f"https://naftas.com.ar/api/fuel?city={city.replace(' ', '%20')}"
@@ -55,7 +85,7 @@ def main():
                     print(f"Error consultando combustibles para {city}: {e}")
 
         conn.commit()
-    print("¡Proceso de recolección completo!")
+    print("¡Proceso completo de recolección de capitales!")
 
 if __name__ == "__main__":
     main()
