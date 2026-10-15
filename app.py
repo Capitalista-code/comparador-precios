@@ -3,15 +3,46 @@ import streamlit as st
 import pandas as pd
 import psycopg
 
-st.set_page_config(page_title="Indicadores Argentina", page_icon="📈", layout="wide")
+# Configuración inicial de la página
+st.set_page_config(
+    page_title="Indicadores Argentina", 
+    page_icon="🇦🇷", 
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("📊 Panel de Indicadores Económicos y Combustibles - Argentina")
-st.markdown("Cotizaciones de dólares y precios de naftas en tiempo real actualizadas desde Supabase.")
+# Estilos CSS personalizados para darle un toque moderno
+st.markdown("""
+    <style>
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    .metric-card {
+        background-color: #1e2129;
+        border: 1px solid #2d3139;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 15px;
+    }
+    h1 {
+        color: #fafafa;
+        font-weight: 700;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
+# Título Principal
+st.title("🇦🇷 Panel Económico & Energético")
+st.markdown("Cotizaciones del dólar y precios de combustibles actualizados en tiempo real desde Supabase.")
+st.divider()
+
+# Conexión y carga de datos
+@st.cache_data(ttl=600)
 def load_data():
     db_url = os.environ.get("DATABASE_URL") or (st.secrets.get("DATABASE_URL") if hasattr(st, "secrets") else None)
     if not db_url:
-        st.error("No se encontró la variable DATABASE_URL.")
         return pd.DataFrame(), pd.DataFrame()
     
     query_dolar = """
@@ -36,10 +67,22 @@ def load_data():
 
 df_dolar, df_fuel = load_data()
 
-tab1, tab2 = st.tabs(["💱 Dólares", "⛽ Combustibles"])
+# Sidebar con opciones y estado
+with st.sidebar:
+    st.header("⚙️ Controles")
+    if st.button("🔄 Actualizar Datos", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+    
+    st.markdown("---")
+    st.info("💡 **Tip:** Los datos de combustibles se actualizan automáticamente mediante GitHub Actions.")
+    st.markdown("Desarrollado con **Streamlit**, **Supabase** y **Python**.")
+
+# Pestañas principales
+tab1, tab2 = st.tabs(["💱 Cotizaciones de Dólares", "⛽ Precios de Combustibles"])
 
 with tab1:
-    st.subheader("Cotizaciones de Dólares")
+    st.subheader("💱 Dólar en Argentina")
     if df_dolar.empty:
         st.warning("No hay datos de dólares guardados todavía.")
     else:
@@ -47,36 +90,41 @@ with tab1:
         for index, row in df_dolar.iterrows():
             col = cols[index % 3]
             with col:
+                sell_val = f"\${row['sell_price']:,.2f}" if pd.notnull(row['sell_price']) else "N/D"
+                buy_val = f"Compra: \${row['buy_price']:,.2f}" if pd.notnull(row['buy_price']) else "Compra: N/D"
+                
                 st.metric(
                     label=row["name"],
-                    value=f"${row['sell_price']}" if pd.notnull(row['sell_price']) else "N/D",
-                    delta=f"Compra: ${row['buy_price']}" if pd.notnull(row['buy_price']) else None
+                    value=sell_val,
+                    delta=buy_val
                 )
                 st.caption(f"Actualizado: {row['recorded_at']}")
+                st.markdown("---")
 
 with tab2:
-    st.subheader("Precios de Combustibles por Ciudad y Bandera")
+    st.subheader("⛽ Estación de Precios por Provincia")
     if df_fuel.empty:
-        st.warning("No hay datos de combustibles guardados todavía. Ejecutá el recolector en GitHub Actions.")
+        st.warning("No hay datos de combustibles guardados todavía.")
     else:
-        ciudades = df_fuel["city"].unique()
-        default_idx = list(ciudades).index("SANTA FE") if "SANTA FE" in ciudades else 0
-        selected_city = st.selectbox("Seleccioná la Ciudad:", ciudades, index=default_idx)
+        ciudades = sorted(df_fuel["city"].unique())
+        default_idx = ciudades.index("SANTA FE") if "SANTA FE" in ciudades else 0
+        
+        selected_city = st.selectbox("🏙️ Seleccioná la Capital / Ciudad:", ciudades, index=default_idx)
         
         df_filtered = df_fuel[df_fuel["city"] == selected_city]
+        empresas = sorted(df_filtered["company"].unique())
         
-        empresas = df_filtered["company"].unique()
-        for emp in empresas:
-            st.markdown(f"### ⛽ {emp}")
-            df_emp = df_filtered[df_filtered["company"] == emp]
-            
-            st.dataframe(
-                df_emp[["fuel_type", "price", "valid_date"]].rename(
-                    columns={"fuel_type": "Combustible", "price": "Precio ($)", "valid_date": "Vigencia"}
-                ),
-                hide_index=True,
-                use_container_width=True
-            )
-
-if st.button("🔄 Actualizar datos"):
-    st.rerun()
+        if not empresas:
+            st.info(f"No hay registros de combustibles para {selected_city}.")
+        else:
+            cols_emp = st.columns(min(len(empresas), 3))
+            for i, emp in enumerate(empresas):
+                col = cols_emp[i % len(cols_emp)]
+                with col:
+                    st.markdown(f"### ⛽ {emp}")
+                    df_emp = df_filtered[df_filtered["company"] == emp]
+                    
+                    for _, row in df_emp.iterrows():
+                        precio_str = f"\${row['price']:,.2f}" if pd.notnull(row['price']) else "N/D"
+                        st.markdown(f"**{row['fuel_type']}**: `{precio_str}`")
+                    st.markdown("---")
