@@ -354,7 +354,11 @@ def dom_fallback(page, category: str | None) -> list[Product]:
             continue
         lines = [clean_text(x) for x in c["text"].split("\n") if clean_text(x)]
         name = next((x for x in lines if len(x) > 3 and not re.match(r"^[$\d]|%|off|agregar|comprar", x, re.I)), None)
-        prices = sorted({p for p in (parse_price(m) for m in re.findall(r"\$\s*[\d.]+(?:,\d{1,2})?", c["text"])) if p})
+        
+        # FILTRO CLAVE: Excluir líneas que hablen de cuotas para no confundir precios
+        filtered_text = "\n".join([line for line in lines if "cuota" not in line.lower()])
+        prices = sorted({p for p in (parse_price(m) for m in re.findall(r"\$\s*[\d.]+(?:,\d{1,2})?", filtered_text)) if p})
+        
         if not (name and prices):
             continue
         seen.add(ext_id)
