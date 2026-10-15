@@ -62,7 +62,7 @@ def make_user_agent(chromium_version: str) -> str:
     de una misma sesión es más sospechoso que mantenerlo."""
     major = chromium_version.split(".")[0]
     platform = random.choice(["Windows NT 10.0; Win64; x64", "Macintosh; Intel Mac OS X 10_15_7",
-                              "X11; Linux x86_64"])
+                            "X11; Linux x86_64"])
     return f"Mozilla/5.0 ({platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36"
 
 
@@ -85,7 +85,7 @@ def goto_with_retry(page, url: str, retries: int = 3) -> None:
         resp, error = None, None
         try:
             resp = page.goto(url, wait_until="domcontentloaded", timeout=60000)
-        except Exception as e:                      # timeout, DNS, conexión cortada
+        except Exception as e:                        # timeout, DNS, conexión cortada
             error = e
         status = resp.status if resp else None
         title = ""
@@ -95,7 +95,7 @@ def goto_with_retry(page, url: str, retries: int = 3) -> None:
             except Exception:
                 pass
         blocked = status in BLOCK_STATUS or any(t in title for t in BLOCK_TITLES)
-        if resp and not blocked and (status < 400 or status == 404):   # 404 = página fuera de rango
+        if resp and not blocked and (status < 400 or status == 404):    # 404 = página fuera de rango
             return
         if attempt == retries:
             raise BlockedError(f"{url} -> status={status} title={title!r} error={error}")
@@ -219,7 +219,7 @@ STOCK_KEYS = ["in_stock", "instock", "available", "disponible"]
 
 def _flat(d: dict) -> dict:
     flat = {str(k).lower(): v for k, v in d.items()}
-    if isinstance(d.get("data"), dict):           # formato tipo Constructor.io: {value, data:{...}}
+    if isinstance(d.get("data"), dict):            # formato tipo Constructor.io: {value, data:{...}}
         for k, v in d["data"].items():
             flat.setdefault(str(k).lower(), v)
     return flat
@@ -392,7 +392,7 @@ def scrape_category(page, cap: Capture, url: str, max_pages: int, delay: tuple[f
             batch, source = dom_fallback(page, category), "dom"
         new = [p for p in batch if p.external_id not in products]
         print(f"     {len(batch)} productos ({source}), {len(new)} nuevos")
-        if not new:                             # página vacía o repetida = fin
+        if not new:                           # página vacía o repetida = fin
             break
         products.update({p.external_id: p for p in new})
         time.sleep(random.uniform(*delay))
@@ -427,17 +427,17 @@ def save_products(conn, products: list[Product], status: str = 'ok') -> dict:
                      (retailer_id, external_id, url, raw_name, raw_brand, raw_category, raw_ean, ean,
                       image_url, normalized_name, parsed_brand, size_base, size_unit, pack_qty,
                       is_active, last_seen_at)
-                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,true,now())
-                   on conflict (retailer_id, external_id) do update set
-                     url = excluded.url, raw_name = excluded.raw_name, raw_brand = excluded.raw_brand,
-                     raw_category = excluded.raw_category,
-                     raw_ean = coalesce(excluded.raw_ean, retailer_products.raw_ean),
-                     ean = coalesce(excluded.ean, retailer_products.ean),
-                     image_url = excluded.image_url, normalized_name = excluded.normalized_name,
-                     parsed_brand = excluded.parsed_brand, size_base = excluded.size_base,
-                     size_unit = excluded.size_unit, pack_qty = excluded.pack_qty,
-                     is_active = true, last_seen_at = now()
-                   returning id""",
+                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,true,now())
+                    on conflict (retailer_id, external_id) do update set
+                      url = excluded.url, raw_name = excluded.raw_name, raw_brand = excluded.raw_brand,
+                      raw_category = excluded.raw_category,
+                      raw_ean = coalesce(excluded.raw_ean, retailer_products.raw_ean),
+                      ean = coalesce(excluded.ean, retailer_products.ean),
+                      image_url = excluded.image_url, normalized_name = excluded.normalized_name,
+                      parsed_brand = excluded.parsed_brand, size_base = excluded.size_base,
+                      size_unit = excluded.size_unit, pack_qty = excluded.pack_qty,
+                      is_active = true, last_seen_at = now()
+                    returning id""",
                 (retailer_id, p.external_id, p.url, p.name, p.brand, p.category, p.raw_ean, p.ean,
                  p.image_url, normalize_text(p.name), normalize_text(p.brand) if p.brand else None,
                  p.size_base, p.size_unit, p.pack_qty))
@@ -454,8 +454,8 @@ def save_products(conn, products: list[Product], status: str = 'ok') -> dict:
 
             cur.execute(
                 """select price, list_price, in_stock from price_history
-                   where retailer_product_id = %s and store_id = %s
-                   order by scraped_at desc limit 1""", (rp_id, store_id))
+                    where retailer_product_id = %s and store_id = %s
+                    order by scraped_at desc limit 1""", (rp_id, store_id))
             last = cur.fetchone()
             if last and float(last[0]) == price and (float(last[1]) if last[1] is not None else None) == list_price \
                     and last[2] == p.in_stock:
@@ -464,7 +464,7 @@ def save_products(conn, products: list[Product], status: str = 'ok') -> dict:
             cur.execute(
                 """insert into price_history
                      (retailer_product_id, store_id, price, list_price, unit_price, in_stock)
-                   values (%s,%s,%s,%s,%s,%s)""",
+                    values (%s,%s,%s,%s,%s,%s)""",
                 (rp_id, store_id, price, list_price, unit_price, p.in_stock))
             stats["prices_inserted"] += 1
 
@@ -478,6 +478,82 @@ def save_products(conn, products: list[Product], status: str = 'ok') -> dict:
 # ======================================================================
 # CLI
 # ======================================================================
+def init_db(conn):
+    """Crea automáticamente todas las tablas necesarias si no existen."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS retailers (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                slug VARCHAR(100) UNIQUE NOT NULL,
+                website TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS stores (
+                id SERIAL PRIMARY KEY,
+                retailer_id INT REFERENCES retailers(id) ON DELETE CASCADE,
+                external_id VARCHAR(255) NOT NULL,
+                name TEXT,
+                is_online BOOLEAN,
+                CONSTRAINT stores_retailer_id_external_id_key UNIQUE (retailer_id, external_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS products (
+                id SERIAL PRIMARY KEY,
+                retailer_id INT REFERENCES retailers(id) ON DELETE CASCADE,
+                external_id VARCHAR(255) NOT NULL,
+                name TEXT,
+                category TEXT,
+                brand TEXT,
+                image_url TEXT,
+                CONSTRAINT products_retailer_id_external_id_key UNIQUE (retailer_id, external_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS retailer_products (
+                id SERIAL PRIMARY KEY,
+                retailer_id INT REFERENCES retailers(id) ON DELETE CASCADE,
+                product_id INT REFERENCES products(id) ON DELETE CASCADE,
+                external_id VARCHAR(255),
+                url TEXT,
+                raw_name TEXT,
+                raw_brand TEXT,
+                raw_category TEXT,
+                raw_ean TEXT,
+                ean TEXT,
+                image_url TEXT,
+                normalized_name TEXT,
+                parsed_brand TEXT,
+                size_base NUMERIC(12, 2),
+                size_unit VARCHAR(50),
+                pack_qty INT DEFAULT 1,
+                is_active BOOLEAN DEFAULT TRUE,
+                last_seen_at TIMESTAMP,
+                CONSTRAINT retailer_products_retailer_id_product_id_key UNIQUE (retailer_id, external_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS price_history (
+                id SERIAL PRIMARY KEY,
+                retailer_product_id INT REFERENCES retailer_products(id) ON DELETE CASCADE,
+                store_id INT REFERENCES stores(id) ON DELETE CASCADE,
+                price NUMERIC(12, 2) NOT NULL,
+                list_price NUMERIC(12, 2),
+                unit_price NUMERIC(12, 4),
+                in_stock BOOLEAN,
+                scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS scrape_runs (
+                id SERIAL PRIMARY KEY,
+                retailer_id INT REFERENCES retailers(id) ON DELETE CASCADE,
+                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                finished_at TIMESTAMP,
+                status VARCHAR(50) DEFAULT 'running',
+                items_count INT DEFAULT 0
+            );
+        """)
+        conn.commit()
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Scraper de Coto Digital")
     ap.add_argument("--category-url", action="append", help="URL de categoría (repetible)")
@@ -530,7 +606,8 @@ def main() -> int:
         return 0
 
     import psycopg
-    with psycopg.connect(args.db_url, prepare_threshold=None) as conn:   # compatible con el pooler de Supabase
+    with psycopg.connect(args.db_url, prepare_threshold=None) as conn:
+        init_db(conn)
         print(save_products(conn, products, "partial" if cap.blocked else "ok"))
     return 3 if cap.blocked else 0
 
