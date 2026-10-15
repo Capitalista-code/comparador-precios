@@ -262,6 +262,18 @@ def product_from_dict(d: dict, category: str | None) -> Product | None:
     if sale is not None and regular is not None and sale >= regular:
         sale = None
 
+    # 🛑 FILTRO ANTICUOTAS Y PRECIOS FALSOS:
+    # Ningún producto de supermercado válido vale menos de $400. 
+    # Si detecta un valor menor, lo descarta (elimina cuotas coladas en el JSON).
+    if regular is not None and regular < 400:
+        regular = None
+    if sale is not None and sale < 400:
+        sale = None
+    if regular is None:
+        regular = sale
+    if sale is not None and regular is not None and sale >= regular:
+        sale = None
+
     if not (name and ext_id and regular):
         return None
 
