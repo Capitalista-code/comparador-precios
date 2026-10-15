@@ -1,6 +1,4 @@
-playwright>=1.47
-psycopg[binary]>=3.2
 streamlit
 requests
-psycopg[binary]
+psycopg[binary]>=3.2
 pandas
