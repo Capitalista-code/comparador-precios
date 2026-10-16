@@ -132,7 +132,7 @@ with st.sidebar:
     st.markdown("<p style='font-size: 9px; color: #a8a29e;'>Terminal Profesional v2.0</p>", unsafe_allow_html=True)
 
 # ==========================================
-# RENDERIZADO DE TARJETAS DE DÓLAR (ESTILO COMPACTO)
+# RENDERIZADO DE TARJETAS DE DÓLAR
 # ==========================================
 def render_dollar_cards(df):
     if df.empty:
@@ -155,8 +155,8 @@ def render_dollar_cards(df):
         venta = row.get('sell_price', 0)
         compra = row.get('buy_price', 0)
         
-        str_venta = f"\${venta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(venta) else "-"
-        str_compra = f"\${compra:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(compra) else "-"
+        str_venta = f"${venta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(venta) else "-"
+        str_compra = f"${compra:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(compra) else "-"
         
         accent = get_accent(nombre)
         cards_html += f'<div class="dollar-card {accent}"><div class="dollar-title">{nombre}</div><div class="dollar-price">{str_venta}</div><div class="dollar-range">C: {str_compra} / V: {str_venta}</div></div>'
@@ -179,9 +179,9 @@ if "Resumen" in seleccion_actual:
     st.markdown("##### 🌾 Pizarra de Granos (Referencia Rosario)")
     if not df_grains.empty:
         df_g = df_grains.copy()
-        df_g.columns = ["Grano", "Mercado", "Precio (\$/TN)", "Precio (USD/TN)", "Variación (%)", "Actualización"]
-        df_g["Precio ($/TN)"] = df_g["Precio ($/TN)"].apply(lambda x: f"\${x:,.2f}" if pd.notnull(x) else "-")
-        df_g["Precio (USD/TN)"] = df_g["Precio (USD/TN)"].apply(lambda x: f"US\${x:,.2f}" if pd.notnull(x) else "-")
+        df_g.columns = ["Grano", "Mercado", "Precio ($/TN)", "Precio (USD/TN)", "Variación (%)", "Actualización"]
+        df_g["Precio ($/TN)"] = df_g["Precio ($/TN)"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
+        df_g["Precio (USD/TN)"] = df_g["Precio (USD/TN)"].apply(lambda x: f"US${x:,.2f}" if pd.notnull(x) else "-")
         df_g["Variación (%)"] = df_g["Variación (%)"].apply(lambda x: f"{x:+.2f}%" if pd.notnull(x) else "-")
         st.dataframe(df_g, hide_index=True, use_container_width=True)
     else:
@@ -201,9 +201,9 @@ elif "Pizarra" in seleccion_actual:
         st.info("Todavía no hay datos de granos recolectados.")
     else:
         df_g = df_grains.copy()
-        df_g.columns = ["Grano", "Mercado", "Precio (\$/TN)", "Precio (USD/TN)", "Variación (%)", "Actualización"]
-        df_g["Precio ($/TN)"] = df_g["Precio ($/TN)"].apply(lambda x: f"\${x:,.2f}" if pd.notnull(x) else "-")
-        df_g["Precio (USD/TN)"] = df_g["Precio (USD/TN)"].apply(lambda x: f"US\${x:,.2f}" if pd.notnull(x) else "-")
+        df_g.columns = ["Grano", "Mercado", "Precio ($/TN)", "Precio (USD/TN)", "Variación (%)", "Actualización"]
+        df_g["Precio ($/TN)"] = df_g["Precio ($/TN)"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
+        df_g["Precio (USD/TN)"] = df_g["Precio (USD/TN)"].apply(lambda x: f"US${x:,.2f}" if pd.notnull(x) else "-")
         df_g["Variación (%)"] = df_g["Variación (%)"].apply(lambda x: f"{x:+.2f}%" if pd.notnull(x) else "-")
         st.dataframe(df_g, hide_index=True, use_container_width=True)
 
@@ -224,4 +224,8 @@ elif "Combustibles" in seleccion_actual:
         pivot_fuel = df_f.pivot_table(index="fuel_category", columns="company", values="price", aggfunc="first").reset_index()
         for col in pivot_fuel.columns:
             if col != "fuel_category":
-                pivot_fuel[col] = pivot_fuel[col].apply(lambda x: f
+                pivot_fuel[col] = pivot_fuel[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
+        pivot_fuel = pivot_fuel.rename(columns={"fuel_category": "Combustible"})
+        
+        st.markdown(f"**Precios vigentes en {selected_city}**")
+        st.dataframe(pivot_fuel, hide_index=True, use_container_width=True)
