@@ -11,7 +11,7 @@ st.set_page_config(
 
 col_title, col_btn = st.columns([7, 3])
 with col_title:
-    st.title("📈 Panel Financierio, Energético & Agro | Argentina")
+    st.title("📈 Panel Financiero, Energético & Agro | Argentina")
 with col_btn:
     st.write("")
     if st.button("🔄 Actualizar Datos", use_container_width=True):
@@ -50,11 +50,81 @@ with tab1:
     if df_dolar.empty:
         st.info("Sin registros de dólares.")
     else:
-        df_d = df_dolar[["name", "buy_price", "sell_price", "recorded_at"]].copy()
-        df_d.columns = ["Indicador", "Compra ($)", "Venta ($)", "Actualización"]
-        df_d["Compra ($)"] = df_d["Compra ($)"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
-        df_d["Venta ($)"] = df_d["Venta ($)"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
-        st.dataframe(df_d, hide_index=True, use_container_width=True)
+        # Inyectar estilos CSS para las tarjetas estilo terminal financiera
+        st.markdown("""
+        <style>
+        .dollar-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 14px;
+            margin-top: 10px;
+            margin-bottom: 25px;
+        }
+        .dollar-card {
+            background-color: #faf8f5;
+            border: 1px solid #e7e2d9;
+            border-radius: 6px;
+            padding: 14px 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+        .card-blue { border-top: 3px solid #3b82f6; }
+        .card-green { border-top: 3px solid #10b981; }
+        .card-purple { border-top: 3px solid #8b5cf6; }
+        .card-indigo { border-top: 3px solid #6366f1; }
+        .card-amber { border-top: 3px solid #d97706; }
+        .card-gray { border-top: 3px solid #78716c; }
+
+        .dollar-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #78716c;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+        .dollar-price {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1c1917;
+            margin-bottom: 6px;
+        }
+        .dollar-range {
+            font-size: 11px;
+            color: #8c857b;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        cards_html = '<div class="dollar-grid">'
+        
+        def get_accent(name):
+            n = str(name).lower()
+            if 'blue' in n: return 'card-blue'
+            if 'oficial' in n or 'banco nación' in n: return 'card-green'
+            if 'mep' in n or 'bolsa' in n: return 'card-purple'
+            if 'ccl' in n or 'contado' in n: return 'card-indigo'
+            if 'tarjeta' in n: return 'card-amber'
+            return 'card-gray'
+
+        for _, row in df_dolar.iterrows():
+            nombre = row.get('name', 'Dólar')
+            venta = row.get('sell_price', 0)
+            compra = row.get('buy_price', 0)
+            
+            str_venta = f"${venta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(venta) else "-"
+            str_compra = f"${compra:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(compra) else "-"
+            
+            accent = get_accent(nombre)
+            
+            cards_html += f"""
+            <div class="dollar-card {accent}">
+                <div class="dollar-title">{nombre}</div>
+                <div class="dollar-price">{str_venta}</div>
+                <div class="dollar-range">C: {str_compra} / V: {str_venta}</div>
+            </div>
+            """
+        cards_html += '</div>'
+        st.markdown(cards_html, unsafe_allow_html=True)
 
 with tab2:
     if df_fuel.empty:
