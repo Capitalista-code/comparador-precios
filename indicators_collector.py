@@ -14,67 +14,61 @@ CITIES = [
 def main():
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
-        sys.exit("Falta DATABASE_URL en las variables de entorno.")
+        sys.exit("Error: Falta la variable de entorno DATABASE_URL.")
 
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "application/json"
     }
 
     with psycopg.connect(db_url) as conn:
         with conn.cursor() as cur:
-            # 1. Dólares
-            print("Consultando dólares...")
+            
+            # 1. Recolección de Dólares
             try:
                 resp = requests.get(URL_DOLAR, headers=headers, timeout=10)
                 if resp.status_code == 200:
                     for item in resp.json():
                         cur.execute(
-                            "INSERT INTO economic_indicators (indicator_type, name, buy_price, sell_price) VALUES (%s, %s, %s, %s)",
+                            """
+                            INSERT INTO economic_indicators (indicator_type, name, buy_price, sell_price) 
+                            VALUES (%s, %s, %s, %s)
+                            """,
                             (item.get("casa"), item.get("nombre"), item.get("compra"), item.get("venta"))
                         )
                     print("-> Dólares guardados con éxito.")
             except Exception as e:
-                print(f"Error dólares: {e}")
+                print(f"Error al procesar dólares: {e}")
 
-            # 2. Granos (granos.ar API oficial)
-            print("Consultando precios de granos en granos.ar...")
+            # 2. Recolectar Granos (granos.ar)
             try:
                 resp = requests.get(URL_GRANOS, headers=headers, timeout=15)
-                print(f"Código de respuesta granos.ar: {resp.status_code}")
-                
                 if resp.status_code == 200:
-                    data = resp.json()
-                    granos_dict = data.get("granos", {})
-                    
-                    if isinstance(granos_dict, dict):
-                        count = 0
-                        for grain_name, details in granos_dict.items():
-                            if isinstance(details, dict):
-                                cur.execute(
-                                    """
-                                    INSERT INTO grain_prices (grain_name, market, price_ars, price_usd, variation)
-                                    VALUES (%s, %s, %s, %s, %s)
-                                    """,
-                                    (
-                                        str(grain_name).capitalize(),
-                                        "Rosario / Pizarra",
-                                        details.get("ars_tn"),
-                                        details.get("usd_tn"),
-                                        details.get("variacion_pct_vs_rueda_anterior")
-                                    )
+                    data = resp.json().get("granos", {})
+                    count = 0
+                    for grain_name, details in data.items():
+                        if isinstance(details, dict):
+                            cur.execute(
+                                """
+                                INSERT INTO grain_prices (grain_name, market, price_ars, price_usd, variation)
+                                VALUES (%s, %s, %s, %s, %s)
+                                """,
+                                (
+                                    str(grain_name).capitalize(),
+                                    "Rosario / Pizarra",
+                                    details.get("ars_tn"),
+                                    details.get("usd_tn"),
+                                    details.get("variacion_pct_vs_rueda_anterior")
                                 )
-                                count += 1
-                        print(f"-> Se guardaron {count} registros de granos con éxito.")
-                    else:
-                        print("-> La estructura de granos no es un diccionario válido.")
+                            )
+                            count += 1
+                    print(f"-> Granos guardados con éxito ({count} registros).")
                 else:
-                    print(f"-> Error en granos.ar. Respuesta: {resp.text[:200]}")
+                    print(f"-> No se pudo acceder a granos.ar (Código: {resp.status_code})")
             except Exception as e:
-                print(f"Excepción al consultar granos.ar: {e}")
+                print(f"Error al procesar granos: {e}")
 
-            # 3. Combustibles
-            print("Consultando combustibles...")
+            # 3. Recolectar Combustibles
             for city in CITIES:
                 try:
                     url_fuel = f"https://naftas.com.ar/api/fuel?city={city.replace(' ', '%20')}"
@@ -84,14 +78,18 @@ def main():
                             for company, fuels in city_info.get("empresas", {}).items():
                                 for fuel_type, details in fuels.items():
                                     cur.execute(
-                                        "INSERT INTO fuel_prices (city, company, fuel_type, price, valid_date) VALUES (%s, %s, %s, %s, %s)",
+                                        """
+                                        INSERT INTO fuel_prices (city, company, fuel_type, price, valid_date) 
+                                        VALUES (%s, %s, %s, %s, %s)
+                                        """,
                                         (city_name, company, fuel_type, details.get("precio"), details.get("fecha_vigencia"))
                                     )
+                        print(f"-> Combustibles de {city} guardados.")
                 except Exception as e:
-                    print(f"Error combustibles {city}: {e}")
+                    print(f"Error al procesar combustibles para {city}: {e}")
 
         conn.commit()
-    print("¡Proceso completo!")
+    print("¡Proceso de recolección finalizado correctamente!")
 
 if __name__ == "__main__":
     main()
