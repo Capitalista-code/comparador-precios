@@ -40,22 +40,22 @@ def main():
             except Exception as e:
                 print(f"Error al procesar dólares: {e}")
 
-            # 2. Recolectar Granos (Leyendo correctamente la clave 'data')
+            # 2. Recolectar Granos (Apuntando correctamente a la clave 'granos')
             try:
                 resp = requests.get(URL_GRANOS, headers=headers, timeout=15)
                 if resp.status_code == 200:
                     json_data = resp.json()
                     
-                    # Aquí estaba el detalle: los granos están dentro de la clave 'data'
-                    granos_dict = json_data.get("data", {})
+                    # Aquí está la clave correcta que devuelve la API
+                    granos_dict = json_data.get("granos", {})
                     
                     if isinstance(granos_dict, dict) and len(granos_dict) > 0:
                         count = 0
                         for grain_name, details in granos_dict.items():
                             if isinstance(details, dict):
-                                ars = details.get("ars_tn") or details.get("precio_ars") or details.get("precio")
-                                usd = details.get("usd_tn") or details.get("precio_usd")
-                                var = details.get("variacion_pct_vs_rueda_anterior") or details.get("variacion")
+                                ars = details.get("ars_tn")
+                                usd = details.get("usd_tn")
+                                var = details.get("variacion_pct_vs_rueda_anterior")
                                 
                                 cur.execute(
                                     """
@@ -73,7 +73,7 @@ def main():
                                 count += 1
                         print(f"-> Granos guardados con éxito ({count} registros).")
                     else:
-                        print("-> La clave 'data' está vacía o no tiene el formato esperado.")
+                        print("-> La clave 'granos' está vacía o no tiene el formato esperado.")
                 else:
                     print(f"-> No se pudo conectar a granos.ar (Código: {resp.status_code})")
             except Exception as e:
