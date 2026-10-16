@@ -40,20 +40,20 @@ def main():
             except Exception as e:
                 print(f"Error al procesar dólares: {e}")
 
-            # 2. Recolectar Granos (granos.ar - Ultra flexible)
+            # 2. Recolectar Granos (Corregido para entrar al nivel 'data')
             try:
                 resp = requests.get(URL_GRANOS, headers=headers, timeout=15)
-                print(f"Respuesta granos.ar (Status): {resp.status_code}")
                 if resp.status_code == 200:
                     json_data = resp.json()
-                    # Extraemos el diccionario de granos (ya sea dentro de la clave 'granos' o el JSON completo)
-                    granos_dict = json_data.get("granos", json_data)
+                    
+                    # Extraemos el diccionario interno de granos según la estructura de la API
+                    granos_dict = json_data.get("data", json_data.get("granos", json_data))
                     
                     if isinstance(granos_dict, dict):
                         count = 0
                         for grain_name, details in granos_dict.items():
-                            # Omitimos claves que sean metadatos y no cultivos
-                            if grain_name.lower() in ["fecha", "tipo_cambio_bna_divisas", "meta", "version"]:
+                            # Omitimos metadatos si los hubiera
+                            if grain_name.lower() in ["fecha", "tipo_cambio", "meta", "version", "status"]:
                                 continue
                                 
                             if isinstance(details, dict):
@@ -77,7 +77,7 @@ def main():
                                 count += 1
                         print(f"-> Granos guardados con éxito ({count} registros).")
                     else:
-                        print("-> La respuesta de granos.ar no tiene el formato esperado.")
+                        print("-> La estructura de granos no es un diccionario válido.")
                 else:
                     print(f"-> No se pudo conectar a granos.ar (Código: {resp.status_code})")
             except Exception as e:
