@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import psycopg
 
-# Configuración inicial con sidebar expandido (fijo y abierto)
+# Configuración inicial con sidebar expandido y diseño responsive
 st.set_page_config(
     page_title="Terminal Financiera & Agro | Argentina", 
     page_icon="📈", 
@@ -11,30 +11,39 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Inyectar estilos CSS globales
+# Estilos CSS avanzados: Estilo granos.ar + Rava Bursátil + Optimización Mobile
 st.markdown("""
 <style>
-    /* Estilo de la barra lateral fija */
+    /* Estilo de la barra lateral (Estilo Granos.ar) */
     section[data-testid="stSidebar"] {
         background-color: #fcfbfa;
         border-right: 1px solid #e7e2d9;
     }
     
-    /* Estilos de las tarjetas de dólares */
+    /* Grilla de tarjetas adaptable a celulares */
     .dollar-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-        gap: 14px;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
         margin-top: 10px;
         margin-bottom: 25px;
     }
+    
+    @media (max-width: 640px) {
+        .dollar-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+    }
+
     .dollar-card {
         background-color: #faf8f5;
         border: 1px solid #e7e2d9;
         border-radius: 6px;
-        padding: 14px 16px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        padding: 12px 14px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.01);
     }
+    
     .card-blue { border-top: 3px solid #3b82f6; }
     .card-green { border-top: 3px solid #10b981; }
     .card-purple { border-top: 3px solid #8b5cf6; }
@@ -43,22 +52,27 @@ st.markdown("""
     .card-gray { border-top: 3px solid #78716c; }
 
     .dollar-title {
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 700;
         color: #78716c;
-        letter-spacing: 0.5px;
-        margin-bottom: 6px;
+        letter-spacing: 0.4px;
+        margin-bottom: 4px;
         text-transform: uppercase;
     }
     .dollar-price {
-        font-size: 22px;
+        font-size: 19px;
         font-weight: 700;
         color: #1c1917;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
     }
     .dollar-range {
-        font-size: 11px;
+        font-size: 10px;
         color: #8c857b;
+    }
+
+    /* Estilo Rava Bursátil para tablas de datos */
+    .dataframe {
+        font-size: 13px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -89,22 +103,20 @@ def normalize_fuel(name):
     else: return name
 
 # ==========================================
-# MENÚ LATERAL (SIDEBAR) FIJO Y UNIFICADO
+# MENÚ LATERAL (SIDEBAR) ESTILO GRANOS.AR
 # ==========================================
 with st.sidebar:
-    st.markdown("<p style='font-size: 11px; color: #78716c; font-weight: 700; margin-bottom:0;'>AGRO • ARGENTINA</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 10px; color: #78716c; font-weight: 700; margin-bottom:0;'>AGRO • FINANZAS • ARGENTINA</p>", unsafe_allow_html=True)
     st.markdown("<h2 style='margin-top: 0; color: #1c1917;'>Terminal.ar</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='font-size: 11px; color: #10b981;'>🟢 Conectado a Supabase</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 11px; color: #10b981; margin-bottom: 10px;'>🟢 Sistema Conectado</p>", unsafe_allow_html=True)
     
     if st.button("🔄 Actualizar Datos", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
     st.markdown("---")
+    st.markdown("<p style='font-size: 10px; color: #78716c; font-weight: 700; letter-spacing: 0.5px;'>NAVEGACIÓN</p>", unsafe_allow_html=True)
     
-    st.markdown("<p style='font-size: 11px; color: #78716c; font-weight: 700;'>NAVEGACIÓN</p>", unsafe_allow_html=True)
-    
-    # Un solo componente de radio unificado para evitar conflictos de selección
     seleccion_actual = st.radio(
         "Secciones",
         [
@@ -117,83 +129,87 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.markdown("<p style='font-size: 10px; color: #a8a29e;'>Terminal Financiera v1.0</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 9px; color: #a8a29e;'>Terminal Profesional v2.0</p>", unsafe_allow_html=True)
 
 # ==========================================
-# CUERPO PRINCIPAL SEGÚN MENÚ SELECCIONADO
+# RENDERIZADO DE TARJETAS DE DÓLAR (ESTILO COMPACTO)
+# ==========================================
+def render_dollar_cards(df):
+    if df.empty:
+        st.info("Sin registros de dólares.")
+        return
+
+    cards_html = '<div class="dollar-grid">'
+    
+    def get_accent(name):
+        n = str(name).lower()
+        if 'blue' in n: return 'card-blue'
+        if 'oficial' in n or 'banco nación' in n: return 'card-green'
+        if 'mep' in n or 'bolsa' in n: return 'card-purple'
+        if 'ccl' in n or 'contado' in n: return 'card-indigo'
+        if 'tarjeta' in n: return 'card-amber'
+        return 'card-gray'
+
+    for _, row in df.iterrows():
+        nombre = row.get('name', 'Dólar')
+        venta = row.get('sell_price', 0)
+        compra = row.get('buy_price', 0)
+        
+        str_venta = f"\${venta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(venta) else "-"
+        str_compra = f"\${compra:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(compra) else "-"
+        
+        accent = get_accent(nombre)
+        cards_html += f'<div class="dollar-card {accent}"><div class="dollar-title">{nombre}</div><div class="dollar-price">{str_venta}</div><div class="dollar-range">C: {str_compra} / V: {str_venta}</div></div>'
+        
+    cards_html += '</div>'
+    st.markdown(cards_html, unsafe_allow_html=True)
+
+# ==========================================
+# VISTAS SEGÚN MENÚ
 # ==========================================
 
 if "Resumen" in seleccion_actual:
-    st.title("📊 Resumen General del Día")
+    st.markdown("### 📊 Resumen General del Día")
+    st.markdown("<p style='font-size: 12px; color: #78716c;'>Panel integrado de cotizaciones y referencias de mercado.</p>", unsafe_allow_html=True)
     st.markdown("---")
     
-    st.subheader("💱 Cotizaciones del Dólar")
-    if df_dolar.empty:
-        st.info("Sin registros de dólares.")
+    st.markdown("##### 💱 Divisas & Dólares")
+    render_dollar_cards(df_dolar)
+    
+    st.markdown("##### 🌾 Pizarra de Granos (Referencia Rosario)")
+    if not df_grains.empty:
+        df_g = df_grains.copy()
+        df_g.columns = ["Grano", "Mercado", "Precio (\$/TN)", "Precio (USD/TN)", "Variación (%)", "Actualización"]
+        df_g["Precio ($/TN)"] = df_g["Precio ($/TN)"].apply(lambda x: f"\${x:,.2f}" if pd.notnull(x) else "-")
+        df_g["Precio (USD/TN)"] = df_g["Precio (USD/TN)"].apply(lambda x: f"US\${x:,.2f}" if pd.notnull(x) else "-")
+        df_g["Variación (%)"] = df_g["Variación (%)"].apply(lambda x: f"{x:+.2f}%" if pd.notnull(x) else "-")
+        st.dataframe(df_g, hide_index=True, use_container_width=True)
     else:
-        cards_html = '<div class="dollar-grid">'
-        def get_accent(name):
-            n = str(name).lower()
-            if 'blue' in n: return 'card-blue'
-            if 'oficial' in n or 'banco nación' in n: return 'card-green'
-            if 'mep' in n or 'bolsa' in n: return 'card-purple'
-            if 'ccl' in n or 'contado' in n: return 'card-indigo'
-            if 'tarjeta' in n: return 'card-amber'
-            return 'card-gray'
-
-        for _, row in df_dolar.iterrows():
-            nombre = row.get('name', 'Dólar')
-            venta = row.get('sell_price', 0)
-            compra = row.get('buy_price', 0)
-            str_venta = f"${venta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(venta) else "-"
-            str_compra = f"${compra:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(compra) else "-"
-            accent = get_accent(nombre)
-            cards_html += f'<div class="dollar-card {accent}"><div class="dollar-title">{nombre}</div><div class="dollar-price">{str_venta}</div><div class="dollar-range">C: {str_compra} / V: {str_venta}</div></div>'
-        cards_html += '</div>'
-        st.markdown(cards_html, unsafe_allow_html=True)
+        st.info("Sin datos de granos cargados.")
 
 elif "Dólares" in seleccion_actual:
-    st.title("💱 Cotizaciones Detalladas del Dólar")
+    st.markdown("### 💱 Cotizaciones del Dólar")
+    st.markdown("<p style='font-size: 12px; color: #78716c;'>Seguimiento de tipos de cambio oficiales, financieros y paralelos.</p>", unsafe_allow_html=True)
     st.markdown("---")
-    if df_dolar.empty:
-        st.info("Sin registros de dólares.")
-    else:
-        cards_html = '<div class="dollar-grid">'
-        def get_accent(name):
-            n = str(name).lower()
-            if 'blue' in n: return 'card-blue'
-            if 'oficial' in n or 'banco nación' in n: return 'card-green'
-            if 'mep' in n or 'bolsa' in n: return 'card-purple'
-            if 'ccl' in n or 'contado' in n: return 'card-indigo'
-            if 'tarjeta' in n: return 'card-amber'
-            return 'card-gray'
-
-        for _, row in df_dolar.iterrows():
-            nombre = row.get('name', 'Dólar')
-            venta = row.get('sell_price', 0)
-            compra = row.get('buy_price', 0)
-            str_venta = f"${venta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(venta) else "-"
-            str_compra = f"${compra:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(compra) else "-"
-            accent = get_accent(nombre)
-            cards_html += f'<div class="dollar-card {accent}"><div class="dollar-title">{nombre}</div><div class="dollar-price">{str_venta}</div><div class="dollar-range">C: {str_compra} / V: {str_venta}</div></div>'
-        cards_html += '</div>'
-        st.markdown(cards_html, unsafe_allow_html=True)
+    render_dollar_cards(df_dolar)
 
 elif "Pizarra" in seleccion_actual:
-    st.title("🌾 Pizarra de Granos (Zona Rosario / Disponible)")
+    st.markdown("### 🌾 Precios de Pizarra - Granos")
+    st.markdown("<p style='font-size: 12px; color: #78716c;'>Cotizaciones oficiales de la Bolsa de Comercio de Rosario.</p>", unsafe_allow_html=True)
     st.markdown("---")
     if df_grains.empty:
-        st.info("Todavía no hay datos de granos recolectados. Ejecutá el workflow en GitHub Actions.")
+        st.info("Todavía no hay datos de granos recolectados.")
     else:
         df_g = df_grains.copy()
-        df_g.columns = ["Grano", "Mercado", "Precio ($/TN)", "Precio (USD/TN)", "Variación (%)", "Actualización"]
-        df_g["Precio ($/TN)"] = df_g["Precio ($/TN)"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
-        df_g["Precio (USD/TN)"] = df_g["Precio (USD/TN)"].apply(lambda x: f"US${x:,.2f}" if pd.notnull(x) else "-")
+        df_g.columns = ["Grano", "Mercado", "Precio (\$/TN)", "Precio (USD/TN)", "Variación (%)", "Actualización"]
+        df_g["Precio ($/TN)"] = df_g["Precio ($/TN)"].apply(lambda x: f"\${x:,.2f}" if pd.notnull(x) else "-")
+        df_g["Precio (USD/TN)"] = df_g["Precio (USD/TN)"].apply(lambda x: f"US\${x:,.2f}" if pd.notnull(x) else "-")
         df_g["Variación (%)"] = df_g["Variación (%)"].apply(lambda x: f"{x:+.2f}%" if pd.notnull(x) else "-")
         st.dataframe(df_g, hide_index=True, use_container_width=True)
 
 elif "Combustibles" in seleccion_actual:
-    st.title("⛽ Precios de Combustibles (YPF, Axion, Puma, Shell)")
+    st.markdown("### ⛽ Mercado Energético (Combustibles)")
+    st.markdown("<p style='font-size: 12px; color: #78716c;'>Matriz comparativa de precios por bandera y localidad.</p>", unsafe_allow_html=True)
     st.markdown("---")
     if df_fuel.empty:
         st.info("Sin registros de combustibles.")
@@ -208,8 +224,4 @@ elif "Combustibles" in seleccion_actual:
         pivot_fuel = df_f.pivot_table(index="fuel_category", columns="company", values="price", aggfunc="first").reset_index()
         for col in pivot_fuel.columns:
             if col != "fuel_category":
-                pivot_fuel[col] = pivot_fuel[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
-        pivot_fuel = pivot_fuel.rename(columns={"fuel_category": "Combustible"})
-        
-        st.markdown(f"**Precios en {selected_city}**")
-        st.dataframe(pivot_fuel, hide_index=True, use_container_width=True)
+                pivot_fuel[col] = pivot_fuel[col].apply(lambda x: f
