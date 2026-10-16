@@ -168,8 +168,8 @@ def render_dollar_cards(df):
         venta = row.get('sell_price', 0)
         compra = row.get('buy_price', 0)
         
-        str_venta = f"\${venta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(venta) else "-"
-        str_compra = f"\${compra:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(compra) else "-"
+        str_venta = f"${venta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(venta) else "-"
+        str_compra = f"${compra:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(compra) else "-"
         accent = get_accent(nombre)
         cards_html += f'<div class="market-card {accent}"><div class="card-title">{nombre}</div><div class="card-price-main">{str_venta}</div><div class="card-subtext">C: {str_compra} / V: {str_venta}</div></div>'
         
@@ -196,8 +196,8 @@ def render_grain_cards(df):
         usd = row.get('price_usd')
         var = row.get('variation', 0)
         
-        str_ars = f"\${ars:,.0f}".replace(",", ".") if pd.notnull(ars) else "-"
-        str_usd = f"US\${usd:,.2f}" if pd.notnull(usd) else "-"
+        str_ars = f"${ars:,.0f}".replace(",", ".") if pd.notnull(ars) else "-"
+        str_usd = f"US${usd:,.2f}" if pd.notnull(usd) else "-"
         
         var_html = ""
         if pd.notnull(var) and var != 0:
@@ -236,7 +236,7 @@ def render_fuel_cards(df, selected_city):
     for _, row in fuel_grouped.iterrows():
         comb = row['fuel_category']
         precio = row['price']
-        str_precio = f"\${precio:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(precio) else "-"
+        str_precio = f"${precio:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(precio) else "-"
         accent = get_fuel_accent(comb)
         cards_html += f'<div class="market-card {accent}"><div class="card-title">{comb}</div><div class="card-price-main">{str_precio}</div><div class="card-subtext">Promedio {selected_city}</div></div>'
         
@@ -259,3 +259,46 @@ if "Resumen" in seleccion_actual:
     render_grain_cards(df_grains)
 
 elif "Dólares" in seleccion_actual:
+    st.markdown("### 💱 Cotizaciones del Dólar")
+    st.markdown("<p style='font-size: 12px; color: #78716c;'>Seguimiento de tipos de cambio oficiales, financieros y paralelos.</p>", unsafe_allow_html=True)
+    st.markdown("---")
+    render_dollar_cards(df_dolar)
+
+elif "Pizarra" in seleccion_actual:
+    st.markdown("### 🌾 Precios Pizarra - Granos")
+    st.markdown("<p style='font-size: 12px; color: #78716c;'>Valores oficiales de pizarra en Pesos y Dólares por Tonelada (Bolsa de Comercio de Rosario).</p>", unsafe_allow_html=True)
+    st.markdown("---")
+    render_grain_cards(df_grains)
+    
+    if not df_grains.empty:
+        st.markdown("##### 📋 Detalle de Precios")
+        df_g = df_grains[["grain_name", "market", "price_ars", "price_usd", "variation", "recorded_at"]].copy()
+        df_g.columns = ["Grano", "Mercado", "Precio ($/TN)", "Precio (USD/TN)", "Variación (%)", "Actualización"]
+        df_g["Precio ($/TN)"] = df_g["Precio ($/TN)"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
+        df_g["Precio (USD/TN)"] = df_g["Precio (USD/TN)"].apply(lambda x: f"US${x:,.2f}" if pd.notnull(x) else "-")
+        df_g["Variación (%)"] = df_g["Variación (%)"].apply(lambda x: f"{x:+.2f}%" if pd.notnull(x) else "-")
+        st.dataframe(df_g, hide_index=True, use_container_width=True)
+
+elif "Combustibles" in seleccion_actual:
+    st.markdown("### ⛽ Mercado Energético (Combustibles)")
+    st.markdown("<p style='font-size: 12px; color: #78716c;'>Matriz comparativa de precios por bandera y localidad en Argentina.</p>", unsafe_allow_html=True)
+    st.markdown("---")
+    if df_fuel.empty:
+        st.info("Sin registros de combustibles.")
+    else:
+        ciudades = sorted(df_fuel["city"].dropna().unique())
+        default_idx = ciudades.index("SANTA FE") if "SANTA FE" in ciudades else 0
+        selected_city = st.selectbox("Seleccionar Ciudad / Capital:", ciudades, index=default_idx)
+        
+        render_fuel_cards(df_fuel, selected_city)
+        
+        st.markdown(f"##### 📊 Matriz por Empresa en {selected_city}")
+        df_f = df_fuel[df_fuel["city"].str.upper().str.strip() == selected_city.upper().strip()].copy()
+        df_f["fuel_category"] = df_f["fuel_type"].apply(normalize_fuel)
+        
+        pivot_fuel = df_f.pivot_table(index="fuel_category", columns="company", values="price", aggfunc="first").reset_index()
+        for col in pivot_fuel.columns:
+            if col != "fuel_category":
+                pivot_fuel[col] = pivot_fuel[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "-")
+        pivot_fuel = pivot_fuel.rename(columns={"fuel_category": "Combustible"})
+        st.dataframe(pivot_fuel, hide_index=True, use_container_width=True)
