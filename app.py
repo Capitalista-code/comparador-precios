@@ -211,7 +211,11 @@ def render_grain_cards(df):
     st.markdown(cards_html, unsafe_allow_html=True)
 
 def render_fuel_cards(df, selected_city):
-    df_c = df[df["city"] == selected_city].copy()
+    if df.empty:
+        st.info("Sin registros de combustibles.")
+        return
+        
+    df_c = df[df["city"].str.upper().str.strip() == selected_city.upper().strip()].copy()
     if df_c.empty:
         st.info(f"Sin registros para {selected_city}.")
         return
@@ -227,7 +231,6 @@ def render_fuel_cards(df, selected_city):
         if 'gnc' in f: return 'card-indigo'
         return 'card-gray'
 
-    # Promediamos o tomamos el valor por tipo de combustible
     fuel_grouped = df_c.groupby("fuel_category")["price"].mean().reset_index()
 
     for _, row in fuel_grouped.iterrows():
@@ -256,20 +259,3 @@ if "Resumen" in seleccion_actual:
     render_grain_cards(df_grains)
 
 elif "Dólares" in seleccion_actual:
-    st.markdown("### 💱 Cotizaciones del Dólar")
-    st.markdown("<p style='font-size: 12px; color: #78716c;'>Seguimiento de tipos de cambio oficiales, financieros y paralelos.</p>", unsafe_allow_html=True)
-    st.markdown("---")
-    render_dollar_cards(df_dolar)
-
-elif "Pizarra" in seleccion_actual:
-    st.markdown("### 🌾 Precios Pizarra - Granos")
-    st.markdown("<p style='font-size: 12px; color: #78716c;'>Valores oficiales de pizarra en Pesos y Dólares por Tonelada (Bolsa de Comercio de Rosario).</p>", unsafe_allow_html=True)
-    st.markdown("---")
-    render_grain_cards(df_grains)
-    
-    if not df_grains.empty:
-        st.markdown("##### 📋 Detalle de Precios")
-        df_g = df_grains.copy()
-        df_g.columns = ["Grano", "Mercado", "Precio (\$/TN)", "Precio (USD/TN)", "Variación (%)", "Actualización"]
-        df_g["Precio ($/TN)"] = df_g["Precio ($/TN)"].apply(lambda x: f"\${x:,.2f}" if pd.notnull(x) else "-")
-        df_g["Precio (USD/TN)"] = df_g
