@@ -4,7 +4,7 @@ import requests
 import psycopg
 
 URL_DOLAR = "https://dolarapi.com/v1/dolares"
-URL_GRANOS = "https://api.granos.ar/pizarra/actual"
+URL_GRANOS = "https://granosar.lfcaucino.workers.dev/api/v1/pizarra"
 
 CITIES = [
     "CAPITAL FEDERAL", "LA PLATA", "CORDOBA", "ROSARIO", 
@@ -37,7 +37,7 @@ def main():
             except Exception as e:
                 print(f"Error dólares: {e}")
 
-            # 2. Granos (granos.ar)
+            # 2. Granos (granos.ar API oficial)
             print("Consultando precios de granos en granos.ar...")
             try:
                 resp = requests.get(URL_GRANOS, headers=headers, timeout=15)
@@ -45,8 +45,7 @@ def main():
                 
                 if resp.status_code == 200:
                     data = resp.json()
-                    # Verificamos la estructura que devuelve
-                    granos_dict = data.get("granos", data) # Intenta adaptarse por si la estructura cambia
+                    granos_dict = data.get("granos", {})
                     
                     if isinstance(granos_dict, dict):
                         count = 0
@@ -60,15 +59,15 @@ def main():
                                     (
                                         str(grain_name).capitalize(),
                                         "Rosario / Pizarra",
-                                        details.get("ars_tn", details.get("precio_ars")),
-                                        details.get("usd_tn", details.get("precio_usd")),
-                                        details.get("variacion_pct_vs_rueda_anterior", details.get("variacion"))
+                                        details.get("ars_tn"),
+                                        details.get("usd_tn"),
+                                        details.get("variacion_pct_vs_rueda_anterior")
                                     )
                                 )
                                 count += 1
                         print(f"-> Se guardaron {count} registros de granos con éxito.")
                     else:
-                        print("-> La respuesta de granos.ar no tiene el formato de diccionario esperado.")
+                        print("-> La estructura de granos no es un diccionario válido.")
                 else:
                     print(f"-> Error en granos.ar. Respuesta: {resp.text[:200]}")
             except Exception as e:
