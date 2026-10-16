@@ -40,31 +40,46 @@ def main():
             except Exception as e:
                 print(f"Error al procesar dólares: {e}")
 
-            # 2. Recolectar Granos (granos.ar)
+            # 2. Recolectar Granos (granos.ar - Ultra flexible)
             try:
                 resp = requests.get(URL_GRANOS, headers=headers, timeout=15)
+                print(f"Respuesta granos.ar (Status): {resp.status_code}")
                 if resp.status_code == 200:
-                    data = resp.json().get("granos", {})
-                    count = 0
-                    for grain_name, details in data.items():
-                        if isinstance(details, dict):
-                            cur.execute(
-                                """
-                                INSERT INTO grain_prices (grain_name, market, price_ars, price_usd, variation)
-                                VALUES (%s, %s, %s, %s, %s)
-                                """,
-                                (
-                                    str(grain_name).capitalize(),
-                                    "Rosario / Pizarra",
-                                    details.get("ars_tn"),
-                                    details.get("usd_tn"),
-                                    details.get("variacion_pct_vs_rueda_anterior")
+                    json_data = resp.json()
+                    # Extraemos el diccionario de granos (ya sea dentro de la clave 'granos' o el JSON completo)
+                    granos_dict = json_data.get("granos", json_data)
+                    
+                    if isinstance(granos_dict, dict):
+                        count = 0
+                        for grain_name, details in granos_dict.items():
+                            # Omitimos claves que sean metadatos y no cultivos
+                            if grain_name.lower() in ["fecha", "tipo_cambio_bna_divisas", "meta", "version"]:
+                                continue
+                                
+                            if isinstance(details, dict):
+                                ars = details.get("ars_tn") or details.get("precio_ars") or details.get("precio")
+                                usd = details.get("usd_tn") or details.get("precio_usd")
+                                var = details.get("variacion_pct_vs_rueda_anterior") or details.get("variacion")
+                                
+                                cur.execute(
+                                    """
+                                    INSERT INTO grain_prices (grain_name, market, price_ars, price_usd, variation)
+                                    VALUES (%s, %s, %s, %s, %s)
+                                    """,
+                                    (
+                                        str(grain_name).capitalize(),
+                                        "Rosario / Pizarra",
+                                        ars,
+                                        usd,
+                                        var
+                                    )
                                 )
-                            )
-                            count += 1
-                    print(f"-> Granos guardados con éxito ({count} registros).")
+                                count += 1
+                        print(f"-> Granos guardados con éxito ({count} registros).")
+                    else:
+                        print("-> La respuesta de granos.ar no tiene el formato esperado.")
                 else:
-                    print(f"-> No se pudo acceder a granos.ar (Código: {resp.status_code})")
+                    print(f"-> No se pudo conectar a granos.ar (Código: {resp.status_code})")
             except Exception as e:
                 print(f"Error al procesar granos: {e}")
 
