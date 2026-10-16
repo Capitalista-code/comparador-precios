@@ -1,29 +1,49 @@
 import os
 import sys
 import requests
+import psycopg
+
+URL_API_GRANOS = "https://granosar.lfcaucino.workers.dev/api/v1/pizarra"
 
 def run():
-    url = "https://bna.com.ar/Personas"
-    
-    print("=== PRUEBA DE CONECTIVIDAD BNA ===")
-    print(f"Intentando conectar a: {url}")
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
-    }
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        sys.exit("Error: Falta DATABASE_URL.")
 
+    print("1. Conectando a la API de granos...")
+    resp = requests.get(URL_API_GRANOS, timeout=15)
+    print(f"-> Status API: {resp.status_code}")
+    
+    json_resp = resp.json()
+    granos_dict = json_resp.get("data", {}).get("granos", {})
+    
+    if not granos_dict:
+        print("-> No hay granos en el JSON.")
+        return
+
+    print("2. Intentando insertar en Supabase...")
     try:
-        resp = requests.get(url, headers=headers, timeout=15)
-        print(f"-> Status Code recibido: {resp.status_code}")
-        print(f"-> Longitud del contenido recibido: {len(resp.text)} caracteres")
-        print(f"-> Primeros 300 caracteres de la respuesta:")
-        print(resp.text[:300])
+        with psycopg.connect(db_url) as conn:
+            with conn.cursor() as cur:
+                for nombre_grano, info in granos_dict.items():
+                    commodity = nombre_grano.capitalize()
+                    price_ars = info.get("ars_tn")
+                    price_usd = info.get("usd_tn")
+                    source = "granos.ar (BCR)"
+
+                    print(f"   Insertando: {commodity} | ARS: {price_ars} | USD: {price_usd}")
+                    cur.execute(
+                        """
+                        INSERT INTO grain_prices (commodity, price_ars, price_usd, source)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (commodity, price_ars, price_usd, source)
+                    )
+            conn.commit()
+        print("-> ¡Inserción en Supabase exitosa!")
         
-    except Exception as e:
-        print(f"-> EXCEPCIÓN AL CONECTAR CON BNA: {e}")
-        
-    print("=== FIN DE PRUEBA ===")
+    except Exception as db_error:
+        print(f"-> ¡ERROR CRÍTICO DE SUPABASE!: {db_error}")
 
 if __name__ == "__main__":
     run()
