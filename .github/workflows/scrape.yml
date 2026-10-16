@@ -1,28 +1,38 @@
-name: Update Economic Indicators
+name: Actualizar Panel Financiero y Agro
 
 on:
   schedule:
-    - cron: "0 */6 * * *"  # Cada 6 horas
-  workflow_dispatch:      # Botón de ejecución manual en GitHub
+    - cron: '0 12,18 * * *' # Se ejecuta automáticamente 2 veces al día
+  workflow_dispatch: # Permite ejecución manual desde GitHub
 
 jobs:
-  run-collector:
+  run-collectors:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout del repositorio
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Configurar Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.10'
+          cache: 'pip'
 
-      - name: Install dependencies
+      - name: Instalar dependencias
         run: |
-          pip install requests psycopg[binary]
+          pip install --no-cache-dir requests psycopg
 
-      - name: Run collector script
+      - name: Ejecutar Recolector de Dólares
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          python indicators_collector.py
+        run: python collectors/collector_dolar.py
+
+      - name: Ejecutar Recolector de Combustibles
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python collectors/collector_combustibles.py
+
+      - name: Ejecutar Recolector de Granos
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python collectors/collector_granos.py
