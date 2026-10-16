@@ -24,62 +24,66 @@ def main():
     with psycopg.connect(db_url) as conn:
         with conn.cursor() as cur:
             
-            # 1. Recolección de Dólares
+            # 1. Dólares
             try:
                 resp = requests.get(URL_DOLAR, headers=headers, timeout=10)
                 if resp.status_code == 200:
                     for item in resp.json():
                         cur.execute(
-                            """
-                            INSERT INTO economic_indicators (indicator_type, name, buy_price, sell_price) 
-                            VALUES (%s, %s, %s, %s)
-                            """,
+                            "INSERT INTO economic_indicators (indicator_type, name, buy_price, sell_price) VALUES (%s, %s, %s, %s)",
                             (item.get("casa"), item.get("nombre"), item.get("compra"), item.get("venta"))
                         )
                     print("-> Dólares guardados con éxito.")
             except Exception as e:
-                print(f"Error al procesar dólares: {e}")
+                print(f"Error en dólares: {e}")
 
-            # 2. Recolectar Granos (Apuntando correctamente a la clave 'granos')
+            # 2. Granos (Analizador universal y blindado)
             try:
                 resp = requests.get(URL_GRANOS, headers=headers, timeout=15)
                 if resp.status_code == 200:
-                    json_data = resp.json()
+                    data = resp.json()
+                    items_to_process = []
                     
-                    # Aquí está la clave correcta que devuelve la API
-                    granos_dict = json_data.get("granos", {})
-                    
-                    if isinstance(granos_dict, dict) and len(granos_dict) > 0:
-                        count = 0
-                        for grain_name, details in granos_dict.items():
-                            if isinstance(details, dict):
-                                ars = details.get("ars_tn")
-                                usd = details.get("usd_tn")
-                                var = details.get("variacion_pct_vs_rueda_anterior")
-                                
-                                cur.execute(
-                                    """
-                                    INSERT INTO grain_prices (grain_name, market, price_ars, price_usd, variation)
-                                    VALUES (%s, %s, %s, %s, %s)
-                                    """,
-                                    (
-                                        str(grain_name).capitalize(),
-                                        "Rosario / Pizarra",
-                                        ars,
-                                        usd,
-                                        var
-                                    )
-                                )
-                                count += 1
-                        print(f"-> Granos guardados con éxito ({count} registros).")
-                    else:
-                        print("-> La clave 'granos' está vacía o no tiene el formato esperado.")
-                else:
-                    print(f"-> No se pudo conectar a granos.ar (Código: {resp.status_code})")
-            except Exception as e:
-                print(f"Error al procesar granos: {e}")
+                    # Normalizamos cualquier estructura JSON (lista, dict anidado, etc.)
+                    if isinstance(data, list):
+                        items_to_process = data
+                    elif isinstance(data, dict):
+                        # Buscamos dentro de 'data', 'granos' o usamos el dict raíz
+                        container = data.get("data") or data.get("granos") or data
+                        if isinstance(container, dict):
+                            for k, v in container.items():
+                                if isinstance(v, dict):
+                                    v["_key_name"] = k
+                                    items_to_process.append(v)
+                        elif isinstance(container, list):
+                            items_to_process = container
 
-            # 3. Recolectar Combustibles
+                    count = 0
+                    for item in items_to_process:
+                        if isinstance(item, dict):
+                            name = item.get("nombre") or item.get("grano") or item.get("grain") or item.get("_key_name")
+                            
+                            # Filtramos llaves contenedoras o metadatos que no sean cultivos
+                            if not name or str(name).lower() in ["data", "granos", "pizarra", "fecha", "status", "version", "meta"]:
+                                continue
+                                
+                            ars = item.get("ars_tn") or item.get("precio_ars") or item.get("precio") or item.get("ars")
+                            usd = item.get("usd_tn") or item.get("precio_usd") or item.get("usd")
+                            var = item.get("variacion_pct_vs_rueda_anterior") or item.get("variacion") or item.get("var")
+                            
+                            cur.execute(
+                                """
+                                INSERT INTO grain_prices (grain_name, market, price_ars, price_usd, variation)
+                                VALUES (%s, %s, %s, %s, %s)
+                                """,
+                                (str(name).capitalize(), "Rosario / Pizarra", ars, usd, var)
+                            )
+                            count += 1
+                    print(f"-> Granos guardados con éxito ({count} registros).")
+            except Exception as e:
+                print(f"Error en granos: {e}")
+
+            # 3. Combustibles
             for city in CITIES:
                 try:
                     url_fuel = f"https://naftas.com.ar/api/fuel?city={city.replace(' ', '%20')}"
@@ -89,18 +93,14 @@ def main():
                             for company, fuels in city_info.get("empresas", {}).items():
                                 for fuel_type, details in fuels.items():
                                     cur.execute(
-                                        """
-                                        INSERT INTO fuel_prices (city, company, fuel_type, price, valid_date) 
-                                        VALUES (%s, %s, %s, %s, %s)
-                                        """,
+                                        "INSERT INTO fuel_prices (city, company, fuel_type, price, valid_date) VALUES (%s, %s, %s, %s, %s)",
                                         (city_name, company, fuel_type, details.get("precio"), details.get("fecha_vigencia"))
                                     )
-                        print(f"-> Combustibles de {city} guardados.")
                 except Exception as e:
-                    print(f"Error al procesar combustibles para {city}: {e}")
+                    print(f"Error combustibles {city}: {e}")
 
         conn.commit()
-    print("¡Proceso de recolección finalizado correctamente!")
+    print("¡Proceso finalizado!")
 
 if __name__ == "__main__":
     main()
