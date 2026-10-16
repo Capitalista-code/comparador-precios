@@ -3,20 +3,21 @@ import streamlit as st
 import pandas as pd
 import psycopg
 
-# Configuración inicial de la página en modo wide
+# Configuración inicial con sidebar expandido (fijo y abierto)
 st.set_page_config(
     page_title="Terminal Financiera & Agro | Argentina", 
     page_icon="📈", 
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Inyectar estilos CSS globales (para las tarjetas de dólares y la barra lateral)
+# Inyectar estilos CSS globales
 st.markdown("""
 <style>
-    /* Estilo general de la barra lateral */
+    /* Estilo de la barra lateral fija */
     section[data-testid="stSidebar"] {
         background-color: #fcfbfa;
-        border-right: 1px string #e7e2d9;
+        border-right: 1px solid #e7e2d9;
     }
     
     /* Estilos de las tarjetas de dólares */
@@ -88,7 +89,7 @@ def normalize_fuel(name):
     else: return name
 
 # ==========================================
-# MENÚ LATERAL (SIDEBAR) ESTILO TERMINAL
+# MENÚ LATERAL (SIDEBAR) FIJO Y UNIFICADO
 # ==========================================
 with st.sidebar:
     st.markdown("<p style='font-size: 11px; color: #78716c; font-weight: 700; margin-bottom:0;'>AGRO • ARGENTINA</p>", unsafe_allow_html=True)
@@ -101,30 +102,35 @@ with st.sidebar:
 
     st.markdown("---")
     
-    st.markdown("<p style='font-size: 11px; color: #78716c; font-weight: 700;'>INICIO</p>", unsafe_allow_html=True)
-    menu_inicio = st.radio("Inicio", ["📊 Resumen del Día"], label_visibility="collapsed")
+    st.markdown("<p style='font-size: 11px; color: #78716c; font-weight: 700;'>NAVEGACIÓN</p>", unsafe_allow_html=True)
     
-    st.markdown("<p style='font-size: 11px; color: #78716c; font-weight: 700; margin-top: 15px;'>MERCADO</p>", unsafe_allow_html=True)
-    menu_mercado = st.radio("Mercado", ["💱 Dólares", "🌾 Precios Pizarra", "⛽ Combustibles"], label_visibility="collapsed")
+    # Un solo componente de radio unificado para evitar conflictos de selección
+    seleccion_actual = st.radio(
+        "Secciones",
+        [
+            "📊 Resumen del Día", 
+            "💱 Dólares", 
+            "🌾 Precios Pizarra", 
+            "⛽ Combustibles"
+        ],
+        label_visibility="collapsed"
+    )
     
     st.markdown("---")
     st.markdown("<p style='font-size: 10px; color: #a8a29e;'>Terminal Financiera v1.0</p>", unsafe_allow_html=True)
 
 # ==========================================
-# CUERPO PRINCIPAL SEGÚN MENÚ
+# CUERPO PRINCIPAL SEGÚN MENÚ SELECCIONADO
 # ==========================================
 
-# Determinamos qué sección mostrar según la selección del sidebar
-seleccion_actual = menu_inicio if menu_inicio else menu_mercado
-
 if "Resumen" in seleccion_actual:
-    col_t1, col_t2 = st.columns([7, 3])
-    with col_t1:
-        st.title("📊 Resumen General del Día")
+    st.title("📊 Resumen General del Día")
     st.markdown("---")
     
-    st.subheader("💱 Cotizaciones Principales del Dólar")
-    if not df_dolar.empty:
+    st.subheader("💱 Cotizaciones del Dólar")
+    if df_dolar.empty:
+        st.info("Sin registros de dólares.")
+    else:
         cards_html = '<div class="dollar-grid">'
         def get_accent(name):
             n = str(name).lower()
