@@ -19,7 +19,7 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install --no-cache-dir requests psycopg
+          pip install --no-cache-dir requests psycopg beautifulsoup4
 
       - name: Ejecutar Recolector de Dólares
         env:
