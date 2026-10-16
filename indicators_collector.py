@@ -40,22 +40,18 @@ def main():
             except Exception as e:
                 print(f"Error al procesar dólares: {e}")
 
-            # 2. Recolectar Granos (Corregido para entrar al nivel 'data')
+            # 2. Recolectar Granos (Leyendo correctamente la clave 'data')
             try:
                 resp = requests.get(URL_GRANOS, headers=headers, timeout=15)
                 if resp.status_code == 200:
                     json_data = resp.json()
                     
-                    # Extraemos el diccionario interno de granos según la estructura de la API
-                    granos_dict = json_data.get("data", json_data.get("granos", json_data))
+                    # Aquí estaba el detalle: los granos están dentro de la clave 'data'
+                    granos_dict = json_data.get("data", {})
                     
-                    if isinstance(granos_dict, dict):
+                    if isinstance(granos_dict, dict) and len(granos_dict) > 0:
                         count = 0
                         for grain_name, details in granos_dict.items():
-                            # Omitimos metadatos si los hubiera
-                            if grain_name.lower() in ["fecha", "tipo_cambio", "meta", "version", "status"]:
-                                continue
-                                
                             if isinstance(details, dict):
                                 ars = details.get("ars_tn") or details.get("precio_ars") or details.get("precio")
                                 usd = details.get("usd_tn") or details.get("precio_usd")
@@ -77,7 +73,7 @@ def main():
                                 count += 1
                         print(f"-> Granos guardados con éxito ({count} registros).")
                     else:
-                        print("-> La estructura de granos no es un diccionario válido.")
+                        print("-> La clave 'data' está vacía o no tiene el formato esperado.")
                 else:
                     print(f"-> No se pudo conectar a granos.ar (Código: {resp.status_code})")
             except Exception as e:
