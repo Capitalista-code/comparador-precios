@@ -116,13 +116,9 @@ with tab1:
             
             accent = get_accent(nombre)
             
-            cards_html += f"""
-            <div class="dollar-card {accent}">
-                <div class="dollar-title">{nombre}</div>
-                <div class="dollar-price">{str_venta}</div>
-                <div class="dollar-range">C: {str_compra} / V: {str_venta}</div>
-            </div>
-            """
+            # HTML en una sola línea para evitar que Markdown lo tome como bloque de código
+            cards_html += f'<div class="dollar-card {accent}"><div class="dollar-title">{nombre}</div><div class="dollar-price">{str_venta}</div><div class="dollar-range">C: {str_compra} / V: {str_venta}</div></div>'
+            
         cards_html += '</div>'
         st.markdown(cards_html, unsafe_allow_html=True)
 
